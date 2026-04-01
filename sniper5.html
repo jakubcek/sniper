@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNIPER // COIN HUNT</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#fff; overflow:hidden; font-family:'Courier New',monospace; cursor:none; user-select:none; }
+#gameCanvas { display:block; position:absolute; top:0; left:0; }
+#ui { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10; }
+#scoreBoard { position:absolute; top:12px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.82); color:#fff; padding:8px 22px; border-radius:3px; font-size:13px; letter-spacing:2px; text-transform:uppercase; display:flex; gap:24px; align-items:center; border:1px solid #333; }
+.p-score { display:flex; flex-direction:column; align-items:center; }
+.p-name { font-size:10px; color:#aaa; margin-bottom:2px; }
+.p-pts { font-size:20px; font-weight:bold; }
+#p1score .p-pts { color:#fff; }
+#p2score .p-pts { color:#e44; }
+.divider { color:#555; font-size:20px; }
+#ammo { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); color:#222; font-size:11px; letter-spacing:3px; }
+#overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; z-index:100; background:rgba(255,255,255,0.97); }
+#lobby { background:#fff; border:2px solid #111; padding:40px 50px; max-width:520px; width:90%; text-align:center; box-shadow:6px 6px 0 #111; }
+#lobby h1 { font-size:28px; letter-spacing:6px; text-transform:uppercase; margin-bottom:6px; }
+#lobby .sub { font-size:11px; color:#888; letter-spacing:3px; margin-bottom:28px; }
+.legend { text-align:left; margin:20px 0; border:1px solid #eee; padding:14px; }
+.legend h3 { font-size:10px; letter-spacing:3px; color:#888; margin-bottom:10px; text-transform:uppercase; }
+.legend-row { display:flex; align-items:center; gap:10px; margin-bottom:7px; font-size:12px; }
+.legend-icon { width:28px; text-align:center; font-size:16px; }
+.legend-pts { margin-left:auto; font-weight:bold; color:#111; min-width:50px; text-align:right; }
+input[type=text] { width:100%; border:2px solid #111; padding:10px 14px; font-family:'Courier New',monospace; font-size:14px; letter-spacing:2px; outline:none; margin-bottom:12px; }
+input[type=text]:focus { border-color:#e44; }
+.btn { background:#111; color:#fff; border:none; padding:12px 28px; font-family:'Courier New',monospace; font-size:12px; letter-spacing:3px; text-transform:uppercase; cursor:pointer; width:100%; margin-top:6px; transition:background 0.15s; }
+.btn:hover { background:#e44; }
+.btn.sec { background:#fff; color:#111; border:2px solid #111; }
+.btn.sec:hover { background:#111; color:#fff; }
+#roomInfo { margin-top:14px; font-size:11px; color:#888; letter-spacing:1px; }
+#roomCode { font-size:16px; color:#111; font-weight:bold; letter-spacing:4px; }
+#waitMsg { margin-top:10px; font-size:12px; color:#aaa; }
+#countdownOverlay { position:absolute; top:0; left:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; z-index:90; pointer-events:none; }
+#countdownNum { font-size:120px; font-weight:bold; color:#111; text-shadow:3px 3px 0 rgba(0,0,0,0.1); animation:pop 0.4s ease-out; }
+@keyframes pop { from{transform:scale(1.8);opacity:0} to{transform:scale(1);opacity:1} }
+#winOverlay { position:absolute; top:0; left:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; z-index:200; background:rgba(255,255,255,0.96); flex-direction:column; }
+#winContent { text-align:center; padding:40px; }
+#winTitle { font-size:36px; letter-spacing:4px; text-transform:uppercase; margin-bottom:8px; }
+#winEmoji { font-size:80px; margin:16px 0; }
+#winBigDick { font-size:22px; font-weight:bold; color:#e44; letter-spacing:2px; }
+#winStats { margin:20px 0; font-size:13px; line-height:1.8; color:#555; }
+#playAgainBtns { display:flex; gap:14px; justify-content:center; margin-top:16px; }
+.play-btn { background:#111; color:#fff; border:none; padding:12px 36px; font-family:'Courier New',monospace; font-size:13px; letter-spacing:3px; cursor:pointer; transition:background 0.15s; }
+.play-btn:hover { background:#e44; }
+.play-btn.no-btn { background:#fff; color:#111; border:2px solid #111; }
+.play-btn.no-btn:hover { background:#eee; }
+.mode-select { display:flex; gap:10px; margin-bottom:10px; }
+.mode-btn { flex:1; background:#fff; color:#111; border:2px solid #111; padding:10px; font-family:'Courier New',monospace; font-size:11px; letter-spacing:2px; cursor:pointer; transition:all 0.15s; }
+.mode-btn.active, .mode-btn:hover { background:#111; color:#fff; }
+#insertCoin { position:absolute; top:0; left:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; z-index:200; background:#fff; cursor:pointer; pointer-events:auto; }
+#insertCoin h2 { font-size:42px; letter-spacing:8px; text-transform:uppercase; animation:blink 0.8s step-end infinite; }
+@keyframes blink { 50%{opacity:0} }
+.crosshair-cursor { pointer-events:none; position:fixed; top:0; left:0; z-index:999; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="ui">
+  <div id="scoreBoard" style="display:none">
+    <div class="p-score" id="p1score">
+      <span class="p-name" id="p1name">PLAYER 1</span>
+      <span class="p-pts" id="p1pts">0</span>
+    </div>
+    <span class="divider">|</span>
+    <div class="p-score" id="p2score" style="display:none">
+      <span class="p-name" id="p2name">PLAYER 2</span>
+      <span class="p-pts" id="p2pts">0</span>
+    </div>
+  </div>
+  <div id="ammo" style="display:none">CLICK TO SHOOT</div>
+</div>
+
+<div id="overlay">
+  <div id="lobby">
+    <h1>COIN HUNT</h1>
+    <div class="sub">SNIPER EDITION</div>
+
+    <div class="mode-select">
+      <button class="mode-btn active" id="soloBtn" onclick="setMode('solo')">SOLO</button>
+      <button class="mode-btn" id="multiBtn" onclick="setMode('multi')">MULTIPLAYER</button>
+    </div>
+
+    <div class="legend">
+      <h3>Targets &amp; Values</h3>
+      <div class="legend-row"><span class="legend-icon">🪙</span><span>Dingdong (72%)</span><span class="legend-pts">1 pt</span></div>
+      <div class="legend-row"><span class="legend-icon">💿</span><span>Silver (10%)</span><span class="legend-pts">5 pts</span></div>
+      <div class="legend-row"><span class="legend-icon">🏅</span><span>Gold (5%)</span><span class="legend-pts">50 pts</span></div>
+      <div class="legend-row"><span class="legend-icon">💎</span><span>Diamond (1%)</span><span class="legend-pts">300 pts</span></div>
+      <div class="legend-row"><span class="legend-icon">🧨</span><span>Dynamite (5%)</span><span class="legend-pts">BOOM</span></div>
+      <div class="legend-row"><span class="legend-icon">☢️</span><span>Atom Bomb (2%)</span><span class="legend-pts">NUKE</span></div>
+      <div class="legend-row"><span class="legend-icon">💩</span><span>Poop (5%)</span><span class="legend-pts" style="color:#a63">Avoid!</span></div>
+    </div>
+
+    <div id="soloSection">
+      <input type="text" id="soloNick" placeholder="YOUR NICKNAME" maxlength="16">
+      <button class="btn" onclick="startSolo()">START GAME</button>
+    </div>
+
+    <div id="multiSection" style="display:none">
+      <input type="text" id="multiNick" placeholder="YOUR NICKNAME" maxlength="16">
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn" style="flex:1" onclick="hostGame()">CREATE ROOM</button>
+        <button class="btn sec" style="flex:1" onclick="showJoinInput()">JOIN ROOM</button>
+      </div>
+      <div id="joinInput" style="display:none;margin-top:10px">
+        <input type="text" id="roomCodeInput" placeholder="ROOM CODE" maxlength="6" style="text-transform:uppercase">
+        <button class="btn" onclick="joinGame()">JOIN</button>
+      </div>
+      <div id="roomInfo" style="display:none">
+        Room: <span id="roomCode"></span>
+        <div id="waitMsg">Waiting for second player...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="countdownOverlay">
+  <span id="countdownNum">3</span>
+</div>
+
+<div id="winOverlay">
+  <div id="winContent">
+    <div id="winTitle"></div>
+    <div id="winEmoji">🍆</div>
+    <div id="winBigDick"></div>
+    <div id="winStats"></div>
+    <div id="playAgainBtns">
+      <button class="play-btn" onclick="playAgainYes()">YES</button>
+      <button class="play-btn no-btn" onclick="playAgainNo()">NO</button>
+    </div>
+  </div>
+</div>
+
+<div id="insertCoin" onclick="insertCoinClick()">
+  <h2>INSERT COIN</h2>
+</div>
+
+<svg class="crosshair-cursor" id="crosshairSVG" width="60" height="60" style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer circle -->
+  <circle cx="30" cy="30" r="26" fill="none" stroke="#111" stroke-width="1.5"/>
+  <!-- Inner circle -->
+  <circle cx="30" cy="30" r="4" fill="none" stroke="#111" stroke-width="1.2"/>
+  <!-- Cross lines with gap -->
+  <line x1="30" y1="4" x2="30" y2="24" stroke="#111" stroke-width="1.2"/>
+  <line x1="30" y1="36" x2="30" y2="56" stroke="#111" stroke-width="1.2"/>
+  <line x1="4" y1="30" x2="24" y2="30" stroke="#111" stroke-width="1.2"/>
+  <line x1="36" y1="30" x2="56" y2="30" stroke="#111" stroke-width="1.2"/>
+</svg>
+
+<svg class="crosshair-cursor" id="crosshairSVG2" width="60" height="60" style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="30" cy="30" r="26" fill="none" stroke="#e44" stroke-width="1.5"/>
+  <circle cx="30" cy="30" r="4" fill="none" stroke="#e44" stroke-width="1.2"/>
+  <line x1="30" y1="4" x2="30" y2="24" stroke="#e44" stroke-width="1.2"/>
+  <line x1="30" y1="36" x2="30" y2="56" stroke="#e44" stroke-width="1.2"/>
+  <line x1="4" y1="30" x2="24" y2="30" stroke="#e44" stroke-width="1.2"/>
+  <line x1="36" y1="30" x2="56" y2="30" stroke="#e44" stroke-width="1.2"/>
+</svg>
+
+<script>
+// ============================================================
+// AUDIO ENGINE
+// ============================================================
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+function unlockAudio() { AC.resume(); }
+document.addEventListener('click', unlockAudio, { once: true });
+
+function playTone(freq, type, duration, vol=0.3, delay=0) {
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  o.connect(g); g.connect(AC.destination);
+  o.type = type; o.frequency.setValueAtTime(freq, AC.currentTime + delay);
+  g.gain.setValueAtTime(vol, AC.currentTime + delay);
+  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + delay + duration);
+  o.start(AC.currentTime + delay);
+  o.stop(AC.currentTime + delay + duration);
+}
+
+function playCling(loud=false) {
+  const vol = loud ? 0.5 : 0.2;
+  playTone(2800, 'sine', 0.3, vol);
+  playTone(3500, 'sine', 0.15, vol*0.5, 0.03);
+}
+
+function playChiChing() {
+  [0,0.08,0.16,0.28].forEach((d,i) => playTone(2200+i*300,'sine',0.25,0.35,d));
+}
+
+function playGoldHit() {
+  [0,0.06,0.12,0.18,0.28,0.38].forEach((d,i) => playTone(1800+i*400,'sine',0.3,0.4,d));
+}
+
+function playShoot() {
+  const buf = AC.createBuffer(1, AC.sampleRate*0.08, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+  const src = AC.createBufferSource();
+  const g = AC.createGain(); g.gain.value = 0.6;
+  const f = AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=800;
+  src.buffer=buf; src.connect(f); f.connect(g); g.connect(AC.destination);
+  src.start();
+}
+
+function playExplosion(big=false) {
+  const dur = big ? 1.5 : 0.6;
+  const buf = AC.createBuffer(1, AC.sampleRate*dur, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length, big?0.3:0.5);
+  const src = AC.createBufferSource();
+  const g = AC.createGain(); g.gain.value = big?1.2:0.8;
+  const f = AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=big?300:500;
+  src.buffer=buf; src.connect(f); f.connect(g); g.connect(AC.destination);
+  src.start();
+}
+
+function playMegaExplosion() {
+  playExplosion(true);
+  setTimeout(()=>playExplosion(true), 200);
+  setTimeout(()=>playExplosion(false), 500);
+}
+
+function playShatter() {
+  for(let i=0;i<8;i++) playTone(3000+Math.random()*2000,'sawtooth',0.1,0.2,i*0.05);
+  playExplosion(false);
+}
+
+function playFart() {
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  o.connect(g); g.connect(AC.destination);
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(120, AC.currentTime);
+  o.frequency.exponentialRampToValueAtTime(60, AC.currentTime+0.4);
+  g.gain.setValueAtTime(0.4, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+0.5);
+  o.start(); o.stop(AC.currentTime+0.5);
+}
+
+function playAirRaid() {
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  o.connect(g); g.connect(AC.destination);
+  o.type='sawtooth';
+  g.gain.value=0.3;
+  const now = AC.currentTime;
+  for(let i=0;i<6;i++){
+    o.frequency.setValueAtTime(400, now+i*0.5);
+    o.frequency.linearRampToValueAtTime(800, now+i*0.5+0.25);
+    o.frequency.linearRampToValueAtTime(400, now+i*0.5+0.5);
+  }
+  o.start(now); o.stop(now+3);
+}
+
+function playMidi() {
+  // Heroic rock-opera style using Web Audio
+  const notes = [
+    [392,0],[440,0.25],[523,0.5],[659,0.75],
+    [784,1],[880,1.25],[784,1.5],[659,1.75],
+    [523,2],[587,2.25],[659,2.5],[784,2.75],
+    [880,3],[1047,3.25],[880,3.5],[784,3.75],
+    [659,4],[784,4.25],[880,4.5],[1047,4.75],
+    [1175,5],[1047,5.25],[880,5.5],[784,5.75],
+    [659,6],[523,6.25],[587,6.5],[659,6.75],
+    [784,7],[659,7.5],[523,8]
+  ];
+  const bassNotes = [
+    [98,0],[110,1],[131,2],[147,3],
+    [165,4],[175,5],[147,6],[131,7]
+  ];
+  notes.forEach(([f,t])=>{
+    playTone(f,'square',0.18,0.12,t);
+    playTone(f*2,'sawtooth',0.1,0.06,t);
+  });
+  bassNotes.forEach(([f,t])=>playTone(f,'sawtooth',0.95,0.2,t));
+}
+
+// loop the midi
+let midiLoop = null;
+function startMusic() {
+  playMidi();
+  midiLoop = setInterval(playMidi, 8200);
+}
+function stopMusic() {
+  clearInterval(midiLoop);
+}
+
+function speak(text, rate=0.85, pitch=0.7, vol=1) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate=rate; u.pitch=pitch; u.volume=vol;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
+function speakFemale(text) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate=0.9; u.pitch=1.6; u.volume=1;
+  window.speechSynthesis.speak(u);
+}
+
+// ============================================================
+// GAME STATE
+// ============================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// PX per "cm" - 1cm = ~38px at 96dpi
+const CM = 28; // slightly smaller for gameplay
+
+const TYPES = {
+  dingdong: { r: 0.3*CM, prob:0.72, pts:1,  color:'#888', shimmer:0 },
+  silver:   { r: 0.5*CM, prob:0.10, pts:5,  color:'#c0c0c0', shimmer:1 },
+  gold:     { r: 0.75*CM,prob:0.05, pts:50, color:'#FFD700', shimmer:2 },
+  diamond:  { r: 1.5*CM, prob:0.01, pts:300,color:'#a8f0ff', shimmer:3 },
+  dynamite: { r: 1.0*CM, prob:0.05, pts:0,  color:'#cc2222', shimmer:0 },
+  atombomb: { r: 1.5*CM, prob:0.02, pts:0,  color:'#555', shimmer:0 },
+  poop:     { r: 1.0*CM, prob:0.05, pts:0,  color:'#7a4000', shimmer:0 }
+};
+
+let objects = [];
+let poopStains = [];
+let particles = [];
+let shakeX=0, shakeY=0, shakeIntensity=0, shakeDuration=0;
+let redFlash=0;
+let gameRunning=false;
+let gameMode='solo'; // 'solo' | 'host' | 'guest'
+let p1 = { name:'P1', score:0, hits:{}, shots:0, hitCount:0, color:'#111' };
+let p2 = { name:'P2', score:0, hits:{}, shots:0, hitCount:0, color:'#e44' };
+let isPlayer1 = true; // this client
+let myMouse = {x:W/2, y:H/2};
+let otherMouse = {x:-100, y:-100};
+let diamondUnlocked = false;
+let spawnTimer = 0;
+let objIdCounter = 0;
+let winningScore = 1000;
+let gameOver = false;
+
+// ============================================================
+// MODE SETUP
+// ============================================================
+function setMode(m) {
+  gameMode = m==='multi'?'multi':'solo';
+  document.getElementById('soloBtn').classList.toggle('active', m==='solo');
+  document.getElementById('multiBtn').classList.toggle('active', m==='multi');
+  document.getElementById('soloSection').style.display = m==='solo'?'block':'none';
+  document.getElementById('multiSection').style.display = m==='multi'?'block':'none';
+}
+
+function startSolo() {
+  const nick = document.getElementById('soloNick').value.trim() || 'HUNTER';
+  p1.name = nick.toUpperCase();
+  document.getElementById('p1name').textContent = p1.name;
+  document.getElementById('p2score').style.display = 'none';
+  isPlayer1 = true;
+  gameMode = 'solo';
+  beginCountdown();
+}
+
+// ============================================================
+// MULTIPLAYER (WebRTC via PeerJS CDN)
+// ============================================================
+let peer, conn;
+
+function loadPeerJS(cb) {
+  if(window.Peer) { cb(); return; }
+  const s = document.createElement('script');
+  s.src='https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+  s.onload=cb; document.head.appendChild(s);
+}
+
+function genRoomCode() {
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code='';
+  for(let i=0;i<5;i++) code+=chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function hostGame() {
+  const nick = document.getElementById('multiNick').value.trim() || 'HUNTER';
+  p1.name = nick.toUpperCase();
+  isPlayer1 = true;
+  loadPeerJS(()=>{
+    const code = genRoomCode();
+    peer = new Peer('coinsniper-'+code);
+    peer.on('open', ()=>{
+      document.getElementById('roomCode').textContent = code;
+      document.getElementById('roomInfo').style.display='block';
+    });
+    peer.on('connection', c=>{
+      conn=c;
+      conn.on('data', onData);
+      conn.on('open', ()=>{
+        // Send init
+        conn.send({type:'init', p2name:''});
+      });
+    });
+  });
+}
+
+function showJoinInput() {
+  document.getElementById('joinInput').style.display='block';
+}
+
+function joinGame() {
+  const nick = document.getElementById('multiNick').value.trim() || 'SHOOTER';
+  const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+  p2.name = nick.toUpperCase(); // I am player 2 on this client? No—
+  // Guest is p2 perspective
+  isPlayer1 = false;
+  p2.name = nick.toUpperCase();
+  loadPeerJS(()=>{
+    peer = new Peer();
+    peer.on('open', ()=>{
+      conn = peer.connect('coinsniper-'+code);
+      conn.on('open', ()=>{
+        conn.send({type:'hello', name: p2.name});
+      });
+      conn.on('data', onData);
+    });
+  });
+}
+
+function sendToOther(data) {
+  if(conn && conn.open) conn.send(data);
+}
+
+function onData(data) {
+  if(data.type==='hello') {
+    // Host receives guest name
+    p2.name = data.name;
+    document.getElementById('p2name').textContent = p2.name;
+    // Send host name back and start
+    conn.send({type:'start', p1name:p1.name, p2name:p2.name, objects: serializeObjects()});
+    document.getElementById('p2score').style.display='flex';
+    beginCountdown();
+  }
+  if(data.type==='start') {
+    p1.name = data.p1name;
+    p2.name = data.p2name;
+    document.getElementById('p1name').textContent = p1.name;
+    document.getElementById('p2name').textContent = p2.name;
+    document.getElementById('p2score').style.display='flex';
+    objects = deserializeObjects(data.objects);
+    beginCountdown();
+  }
+  if(data.type==='init') {
+    // host sends initial state periodically
+  }
+  if(data.type==='sync') {
+    // Full state sync from host
+    if(!isPlayer1) {
+      objects = deserializeObjects(data.objects);
+      poopStains = data.poopStains || [];
+      p1.score = data.p1score;
+      p2.score = data.p2score;
+      updateScoreUI();
+    }
+  }
+  if(data.type==='shoot') {
+    // Other player shot
+    if(!isPlayer1) {
+      // Guest receives host shot
+      handleShot(data.x, data.y, false);
+    } else {
+      handleShot(data.x, data.y, false);
+    }
+  }
+  if(data.type==='mouse') {
+    otherMouse.x = data.x * W;
+    otherMouse.y = data.y * H;
+  }
+  if(data.type==='shake') {
+    triggerShake(data.intensity, data.duration);
+  }
+  if(data.type==='redflash') {
+    redFlash = data.v;
+  }
+  if(data.type==='poopStain') {
+    poopStains.push(data.stain);
+  }
+  if(data.type==='removeObj') {
+    objects = objects.filter(o=>o.id!==data.id);
+  }
+  if(data.type==='win') {
+    showWin(data.winner, data.p1, data.p2);
+  }
+}
+
+function serializeObjects() {
+  return objects.map(o=>({...o}));
+}
+function deserializeObjects(arr) {
+  return arr.map(o=>({...o}));
+}
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+function beginCountdown() {
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('countdownOverlay').style.display='flex';
+  const el = document.getElementById('countdownNum');
+  let n=3;
+  el.textContent=n;
+  speak(String(n));
+  const iv = setInterval(()=>{
+    n--;
+    if(n>0){
+      el.textContent=n;
+      speak(String(n));
+    } else {
+      clearInterval(iv);
+      el.textContent='GO!';
+      speak('Go!');
+      setTimeout(()=>{
+        document.getElementById('countdownOverlay').style.display='none';
+        startGame();
+      }, 600);
+    }
+  },1000);
+}
+
+function startGame() {
+  objects=[];
+  poopStains=[];
+  particles=[];
+  p1.score=0; p1.shots=0; p1.hitCount=0; p1.hits={};
+  p2.score=0; p2.shots=0; p2.hitCount=0; p2.hits={};
+  diamondUnlocked=false;
+  gameOver=false;
+  spawnTimer=0;
+  document.getElementById('scoreBoard').style.display='flex';
+  document.getElementById('ammo').style.display='block';
+  document.getElementById('crosshairSVG').style.display='block';
+  if(gameMode!=='solo') document.getElementById('crosshairSVG2').style.display='block';
+  updateScoreUI();
+  gameRunning=true;
+  startMusic();
+  requestAnimationFrame(loop);
+}
+
+let lastTime=0;
+function loop(ts) {
+  if(!gameRunning) return;
+  const dt = Math.min((ts-lastTime)/1000, 0.05);
+  lastTime=ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  // Spawn
+  spawnTimer+=dt;
+  if(spawnTimer>10) {
+    spawnTimer=0;
+    const count = 8+Math.floor(Math.random()*5);
+    if(isPlayer1 || gameMode==='solo') {
+      for(let i=0;i<count;i++) spawnObject();
+    }
+  }
+
+  // Move objects
+  objects.forEach(o=>{
+    if(o.dying) {
+      o.dyingTimer-=dt;
+      o.alpha = Math.max(0, o.dyingTimer/o.dyingDur);
+      return;
+    }
+    o.x+=o.vx*dt;
+    o.y+=o.vy*dt;
+    if(o.x-o.r<0){o.x=o.r;o.vx=Math.abs(o.vx);}
+    if(o.x+o.r>W){o.x=W-o.r;o.vx=-Math.abs(o.vx);}
+    if(o.y-o.r<0){o.y=o.r;o.vy=Math.abs(o.vy);}
+    if(o.y+o.r>H){o.y=H-o.r;o.vy=-Math.abs(o.vy);}
+    o.angle+=o.spin*dt;
+    o.shimmerPhase+=dt*3;
+  });
+
+  // Remove dead
+  objects = objects.filter(o=>!o.dying||o.dyingTimer>0);
+
+  // Particles
+  particles.forEach(p=>{
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    p.vy+=200*dt;
+    p.life-=dt;
+    p.alpha=Math.max(0,p.life/p.maxLife);
+  });
+  particles=particles.filter(p=>p.life>0);
+
+  // Shake
+  if(shakeDuration>0){
+    shakeDuration-=dt;
+    shakeX=(Math.random()-0.5)*shakeIntensity*2;
+    shakeY=(Math.random()-0.5)*shakeIntensity*2;
+  } else { shakeX=0; shakeY=0; }
+
+  if(redFlash>0) redFlash-=dt;
+
+  // Sync to guest
+  if(isPlayer1 && gameMode!=='solo' && conn && conn.open) {
+    sendToOther({type:'sync', objects:serializeObjects(), poopStains, p1score:p1.score, p2score:p2.score});
+  }
+
+  updateScoreUI();
+}
+
+function draw() {
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // Background
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(-10,-10,W+20,H+20);
+
+  // Poop stains
+  poopStains.forEach(s=>{
+    const g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r);
+    g.addColorStop(0,'rgba(100,50,0,0.55)');
+    g.addColorStop(1,'rgba(80,30,0,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  });
+
+  // Objects
+  objects.forEach(o=>drawObject(o));
+
+  // Particles
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.alpha;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Fire effects stored in particles with type='fire'
+  // (handled via particles above)
+
+  // Red flash
+  if(redFlash>0) {
+    ctx.fillStyle=`rgba(200,0,0,${Math.min(0.35,redFlash*0.3)})`;
+    ctx.fillRect(-10,-10,W+20,H+20);
+  }
+
+  // Other player crosshair
+  if(gameMode!=='solo') {
+    const svg2 = document.getElementById('crosshairSVG2');
+    // Draw a crosshair for other player directly on canvas
+    const ox=otherMouse.x, oy=otherMouse.y;
+    ctx.save();
+    ctx.strokeStyle = isPlayer1?'#e44':'#111';
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(ox,oy,13,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ox,oy,2,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy-20); ctx.lineTo(ox,oy-5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy+5); ctx.lineTo(ox,oy+20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox-20,oy); ctx.lineTo(ox-5,oy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox+5,oy); ctx.lineTo(ox+20,oy); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawObject(o) {
+  ctx.save();
+  ctx.globalAlpha = o.alpha || 1;
+  ctx.translate(o.x, o.y);
+  ctx.rotate(o.angle||0);
+
+  const t = TYPES[o.type];
+  const shimmer = Math.sin(o.shimmerPhase||0)*0.3+0.7;
+
+  if(o.type==='dingdong') {
+    ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2);
+    const g=ctx.createRadialGradient(-o.r*0.3,-o.r*0.3,0,0,0,o.r);
+    g.addColorStop(0,'#bbb'); g.addColorStop(1,'#666');
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='#555'; ctx.lineWidth=1; ctx.stroke();
+  } else if(o.type==='silver') {
+    ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2);
+    const g=ctx.createRadialGradient(-o.r*0.4,-o.r*0.4,0,0,0,o.r);
+    const s=shimmer;
+    g.addColorStop(0,`rgba(255,255,255,${s})`);
+    g.addColorStop(0.4,`rgba(192,192,192,${s})`);
+    g.addColorStop(1,`rgba(100,100,120,${s})`);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='#aaa'; ctx.lineWidth=1.5; ctx.stroke();
+  } else if(o.type==='gold') {
+    ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2);
+    const g=ctx.createRadialGradient(-o.r*0.4,-o.r*0.4,0,0,0,o.r);
+    g.addColorStop(0,`rgba(255,255,180,${shimmer})`);
+    g.addColorStop(0.4,`rgba(255,200,0,${shimmer})`);
+    g.addColorStop(1,`rgba(180,100,0,${shimmer})`);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='#c8900a'; ctx.lineWidth=2; ctx.stroke();
+    // shine dot
+    ctx.beginPath(); ctx.arc(-o.r*0.35,-o.r*0.35,o.r*0.18,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${shimmer*0.7})`; ctx.fill();
+  } else if(o.type==='diamond') {
+    const s=o.r;
+    ctx.beginPath();
+    ctx.moveTo(0,-s); ctx.lineTo(s*0.7,0); ctx.lineTo(0,s*1.2);
+    ctx.lineTo(-s*0.7,0); ctx.closePath();
+    const g=ctx.createLinearGradient(-s,-s,s,s);
+    g.addColorStop(0,`rgba(255,255,255,${shimmer})`);
+    g.addColorStop(0.3,`rgba(150,240,255,${shimmer})`);
+    g.addColorStop(0.6,`rgba(100,180,255,${shimmer})`);
+    g.addColorStop(1,`rgba(200,255,255,${shimmer})`);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='rgba(100,200,255,0.8)'; ctx.lineWidth=2; ctx.stroke();
+    // inner facets
+    ctx.beginPath(); ctx.moveTo(0,-s*0.5); ctx.lineTo(s*0.35,0); ctx.lineTo(-s*0.35,0); ctx.closePath();
+    ctx.fillStyle=`rgba(255,255,255,${shimmer*0.5})`; ctx.fill();
+  } else if(o.type==='dynamite') {
+    // Red stick
+    ctx.fillStyle='#cc0000';
+    ctx.beginPath(); ctx.roundRect(-o.r*0.5,-o.r,o.r,o.r*2,4); ctx.fill();
+    ctx.strokeStyle='#880000'; ctx.lineWidth=1; ctx.stroke();
+    // Fuse
+    ctx.strokeStyle='#888'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(0,-o.r); ctx.lineTo(o.r*0.5,-o.r*1.5); ctx.stroke();
+    ctx.setLineDash([]);
+    // Spark
+    const sp=Math.sin(Date.now()*0.01)*0.5+0.5;
+    ctx.fillStyle=`rgba(255,200,0,${sp})`;
+    ctx.beginPath(); ctx.arc(o.r*0.5,-o.r*1.5,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font=`bold ${o.r*0.8}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💣',0,0);
+  } else if(o.type==='atombomb') {
+    ctx.font=`${o.r*1.8}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('☢️',0,0);
+    // Glow
+    const glow = Math.sin(Date.now()*0.005)*0.3+0.7;
+    ctx.shadowColor=`rgba(0,255,0,${glow})`;
+    ctx.shadowBlur=20;
+    ctx.strokeStyle=`rgba(0,200,0,${glow*0.5})`;
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.stroke();
+    ctx.shadowBlur=0;
+  } else if(o.type==='poop') {
+    ctx.font=`${o.r*1.8}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('💩',0,0);
+  }
+  ctx.restore();
+}
+
+// ============================================================
+// SPAWNING
+// ============================================================
+function pickType() {
+  const myScore = isPlayer1?p1.score:p2.score;
+  const maxScore = Math.max(p1.score,p2.score);
+  let pool = Object.entries(TYPES);
+  // Diamond rules
+  if(maxScore<40) pool=pool.filter(([k])=>k!=='diamond');
+  if(!diamondUnlocked && maxScore>=40 && maxScore<=100) {
+    diamondUnlocked=true;
+  }
+  if(!diamondUnlocked) pool=pool.filter(([k])=>k!=='diamond');
+
+  let total=0;
+  const weights=pool.map(([k,v])=>{total+=v.prob;return total;});
+  const r=Math.random()*total;
+  for(let i=0;i<weights.length;i++) if(r<weights[i]) return pool[i][0];
+  return 'dingdong';
+}
+
+function spawnObject() {
+  const type = pickType();
+  const t = TYPES[type];
+  const margin = t.r+20;
+  const x = margin + Math.random()*(W-margin*2);
+  const y = margin + Math.random()*(H-margin*2);
+  const speed = (50+Math.random()*80)*0.8; // 20% slower
+  const angle = Math.random()*Math.PI*2;
+  const o = {
+    id: objIdCounter++,
+    type, x, y, r:t.r,
+    vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+    angle:0, spin:(Math.random()-0.5)*1.5,
+    shimmerPhase:Math.random()*Math.PI*2,
+    alpha:1, dying:false, dyingTimer:0, dyingDur:1
+  };
+  objects.push(o);
+
+  // Appear sounds
+  if(type==='dingdong') playCling(false);
+  else if(type==='silver') speak('silver coin', 1, 0.7);
+  else if(type==='gold') speak("Oh my god, GOLD!", 1, 0.65);
+  else if(type==='diamond') {
+    speak("No waaaaay, that is a fucking diamond!", 1.1, 0.6);
+    triggerShake(8,0.5);
+  }
+  else if(type==='dynamite') speak("Dy-na-mite!", 0.85, 0.6);
+  else if(type==='atombomb') playAirRaid();
+  else if(type==='poop') speakFemale("oh, that is gross");
+}
+
+// ============================================================
+// SHOOTING
+// ============================================================
+canvas.addEventListener('mousedown', e=>{
+  if(!gameRunning||gameOver) return;
+  const x=e.clientX, y=e.clientY;
+  if(isPlayer1) p1.shots++;
+  else p2.shots++;
+  playShoot();
+  handleShot(x,y,true);
+  if(gameMode!=='solo') sendToOther({type:'shoot',x,y});
+});
+
+canvas.addEventListener('mousemove', e=>{
+  myMouse.x=e.clientX; myMouse.y=e.clientY;
+  const ch = document.getElementById(isPlayer1?'crosshairSVG':'crosshairSVG2');
+  ch.style.left=(e.clientX-30)+'px';
+  ch.style.top=(e.clientY-30)+'px';
+  if(gameMode!=='solo' && conn && conn.open) {
+    sendToOther({type:'mouse',x:e.clientX/W,y:e.clientY/H});
+  }
+});
+
+function handleShot(x,y,isMine) {
+  // Find hit - closest object
+  let hit=null, hitDist=Infinity;
+  objects.forEach(o=>{
+    if(o.dying) return;
+    const d=Math.hypot(o.x-x,o.y-y);
+    if(d<o.r+4&&d<hitDist){hit=o;hitDist=d;}
+  });
+  if(!hit) return;
+
+  const scorer = isMine?(isPlayer1?p1:p2):(isPlayer1?p2:p1);
+  scorer.hitCount++;
+  scorer.hits[hit.type]=(scorer.hits[hit.type]||0)+1;
+
+  hitEffects(hit, x, y, isMine);
+
+  if(hit.type==='dynamite') {
+    dynamiteExplode(hit);
+  } else if(hit.type==='atombomb') {
+    atomExplode(hit);
+  } else if(hit.type==='poop') {
+    poopHit(hit);
+    killObject(hit, 1);
+  } else {
+    scorer.score+=TYPES[hit.type].pts;
+    killObject(hit, hit.type==='dingdong'?1:2);
+  }
+
+  updateScoreUI();
+  checkWin();
+}
+
+function hitEffects(o, x, y, isMine) {
+  if(o.type==='dingdong') playCling(true);
+  else if(o.type==='silver') playChiChing();
+  else if(o.type==='gold') playGoldHit();
+  else if(o.type==='diamond') { playShatter(); }
+  else if(o.type==='poop') { playFart(); speakFemale("ewwwwww!"); }
+  else if(o.type==='dynamite') playExplosion(false);
+  else if(o.type==='atombomb') playMegaExplosion();
+
+  // Particles
+  const count = o.type==='diamond'?20:o.type==='gold'?12:5;
+  const col = TYPES[o.type].color;
+  for(let i=0;i<count;i++) {
+    const a=Math.random()*Math.PI*2;
+    const spd=100+Math.random()*200;
+    particles.push({
+      x:o.x, y:o.y,
+      vx:Math.cos(a)*spd, vy:Math.sin(a)*spd-100,
+      size:2+Math.random()*4,
+      color:col, life:0.8+Math.random()*0.6, maxLife:1.4, alpha:1
+    });
+  }
+}
+
+function killObject(o, dur) {
+  o.dying=true; o.dyingTimer=dur; o.dyingDur=dur;
+  o.vx=0; o.vy=0;
+}
+
+function dynamiteExplode(bomb) {
+  const radius=5*CM;
+  const center={x:bomb.x,y:bomb.y};
+  objects.forEach(o=>{
+    if(o===bomb||o.dying) return;
+    const d=Math.hypot(o.x-center.x,o.y-center.y);
+    if(d<radius&&o.type!=='dynamite'&&o.type!=='atombomb') killObject(o,1);
+  });
+  killObject(bomb,0.5);
+  // Fire particles
+  for(let i=0;i<40;i++){
+    const a=Math.random()*Math.PI*2;
+    const spd=50+Math.random()*150;
+    particles.push({x:bomb.x,y:bomb.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,
+      size:4+Math.random()*8,color:`hsl(${20+Math.random()*40},100%,50%)`,
+      life:0.6+Math.random()*0.8,maxLife:1.4,alpha:1});
+  }
+  triggerShake(15,1);
+  if(gameMode!=='solo') sendToOther({type:'shake',intensity:15,duration:1});
+}
+
+function atomExplode(bomb) {
+  objects.forEach(o=>{ if(!o.dying) killObject(o,2); });
+  redFlash=2;
+  triggerShake(30,2);
+  // Ripple particles
+  for(let i=0;i<80;i++){
+    const a=Math.random()*Math.PI*2;
+    const spd=100+Math.random()*400;
+    particles.push({x:bomb.x,y:bomb.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,
+      size:3+Math.random()*10,color:`hsl(${Math.random()*60},100%,60%)`,
+      life:1+Math.random()*1,maxLife:2,alpha:1});
+  }
+  if(gameMode!=='solo'){
+    sendToOther({type:'shake',intensity:30,duration:2});
+    sendToOther({type:'redflash',v:2});
+  }
+}
+
+function poopHit(o) {
+  const stain={x:o.x,y:o.y,r:3*CM};
+  poopStains.push(stain);
+  if(gameMode!=='solo') sendToOther({type:'poopStain',stain});
+}
+
+function triggerShake(intensity, duration) {
+  shakeIntensity=intensity; shakeDuration=duration;
+}
+
+// ============================================================
+// UI
+// ============================================================
+function updateScoreUI() {
+  document.getElementById('p1pts').textContent=p1.score;
+  document.getElementById('p2pts').textContent=p2.score;
+}
+
+function checkWin() {
+  if(gameOver) return;
+  const winner = p1.score>=winningScore?p1:p2.score>=winningScore?p2:null;
+  if(!winner) return;
+  gameOver=true;
+  gameRunning=false;
+  stopMusic();
+  triggerShake(20,3);
+  setTimeout(()=>{
+    speak(`Congratulations, you won the game! ${winner.name}!`, 0.85, 0.65);
+    setTimeout(()=>{
+      showWin(winner.name, p1, p2);
+      if(gameMode!=='solo') sendToOther({type:'win',winner:winner.name,p1,p2});
+    },1500);
+  },3000);
+}
+
+function showWin(winnerName, _p1, _p2) {
+  const wo = document.getElementById('winOverlay');
+  wo.style.display='flex';
+  document.getElementById('winTitle').textContent=`🏆 ${winnerName} WINS!`;
+  document.getElementById('winBigDick').textContent=`🍆 BIG DICK PLAYER: ${winnerName}`;
+  let stats='';
+  const pct1=_p1.shots?Math.round(_p1.hitCount/_p1.shots*100):0;
+  const pct2=_p2.shots?Math.round(_p2.hitCount/_p2.shots*100):0;
+  stats+=`<b>${_p1.name}</b>: ${_p1.score} pts | Accuracy ${pct1}%<br>`;
+  if(gameMode!=='solo') stats+=`<b>${_p2.name}</b>: ${_p2.score} pts | Accuracy ${pct2}%<br>`;
+  document.getElementById('winStats').innerHTML=stats;
+  // Applause
+  for(let i=0;i<12;i++) setTimeout(()=>playTone(800+Math.random()*400,'sine',0.1,0.15),i*80);
+}
+
+function playAgainYes() {
+  document.getElementById('winOverlay').style.display='none';
+  document.getElementById('insertCoin').style.display='flex';
+  speak('Insert coin', 0.9, 0.65);
+}
+
+function insertCoinClick() {
+  document.getElementById('insertCoin').style.display='none';
+  restartGame();
+}
+
+function restartGame() {
+  objects=[]; poopStains=[]; particles=[];
+  p1.score=0; p1.shots=0; p1.hitCount=0; p1.hits={};
+  p2.score=0; p2.shots=0; p2.hitCount=0; p2.hits={};
+  diamondUnlocked=false; gameOver=false; spawnTimer=0;
+  redFlash=0; shakeIntensity=0; shakeDuration=0;
+  gameRunning=true;
+  startMusic();
+  updateScoreUI();
+  requestAnimationFrame(loop);
+}
+
+function playAgainNo() {
+  speakFemale("Oh nooooooo");
+  document.getElementById('winEmoji').textContent='😭';
+  document.getElementById('playAgainBtns').style.display='none';
+}
+
+// Touch support
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  if(!gameRunning||gameOver) return;
+  const t=e.touches[0];
+  const x=t.clientX, y=t.clientY;
+  if(isPlayer1) p1.shots++;
+  else p2.shots++;
+  playShoot();
+  handleShot(x,y,true);
+  if(gameMode!=='solo') sendToOther({type:'shoot',x,y});
+},{passive:false});
+
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  myMouse.x=t.clientX; myMouse.y=t.clientY;
+  const ch=document.getElementById(isPlayer1?'crosshairSVG':'crosshairSVG2');
+  ch.style.left=(t.clientX-30)+'px';
+  ch.style.top=(t.clientY-30)+'px';
+},{passive:false});
+
+// Initial spawn
+spawnTimer=9; // trigger first spawn fast
+
+console.log('COIN HUNT loaded. Have fun.');
+</script>
+</body>
+</html>
